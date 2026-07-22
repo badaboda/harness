@@ -2,6 +2,14 @@
 
 이 프로젝트는 [Semantic Versioning](https://semver.org/)을 따릅니다.
 
+## [1.2.1] - 2026-07-22
+
+### Changed
+
+- **`references/team-mode-mechanism.md` §스폰 규율 — 실측 기반 근본원인 재규명 및 규율 재정렬.** `TaskStop` 조회로 정지된 중복 3개(`data-eng`·`backend-eng`·`architect-2`)가 전부 *같은 세션·이전 Phase 프롬프트*였음이 확인되어(2026-07-22 실측), 근본원인을 "세션 간 유령"에서 **"Phase 전환 시 이전 Phase 팀원 미-teardown → 동명 충돌"**로 정정.
+  - **규율 우선순위 재정렬:** 규율 1 = **Phase/세션 teardown(근본 해법·필수)**, 규율 2 = 세션-스코프 이름(충돌 방벽·보조로 강등), 규율 3 = 세션 내 재사용/재시작, 규율 4 = main 브로커·File-first.
+  - **`TaskStop` 프로브 기법 추가:** 존재하지 않는 id로 `TaskStop` 호출 시 반환되는 running-teammates 목록으로 실 로스터·잔류를 확인·정지. `TaskList`는 잔류를 못 보여 오판을 유발하므로 잔류 판정은 `TaskStop` 프로브로.
+
 ## [1.2.0] - 2026-07-22
 
 ### Changed
