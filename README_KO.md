@@ -3,12 +3,12 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.0.1-brightgreen.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.1.0-brightgreen.svg" alt="Version">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <img src="https://img.shields.io/badge/Claude_Code-Plugin-purple.svg" alt="Claude Code Plugin">
   <img src="https://img.shields.io/badge/Patterns-6_Architectures-orange.svg" alt="6 Architecture Patterns">
   <img src="https://img.shields.io/badge/Mode-Agent_Teams-green.svg" alt="Agent Teams">
-  <a href="https://github.com/revfactory/harness/stargazers"><img src="https://img.shields.io/github/stars/revfactory/harness?style=social" alt="GitHub Stars"></a>
+  <a href="https://github.com/badaboda/harness/stargazers"><img src="https://img.shields.io/github/stars/badaboda/harness?style=social" alt="GitHub Stars"></a>
 </p>
 
 # Harness
@@ -50,7 +50,7 @@ Phase 6: 검증 및 테스트
 
 #### 마켓플레이스 추가
 ```shell
-/plugin marketplace add revfactory/harness
+/plugin marketplace add badaboda/harness
 ```
 
 #### 플러그인 설치
