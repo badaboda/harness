@@ -1,3 +1,19 @@
+<!--
+Copyright 2026 marcus-kkb
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
 # 스킬 작성 가이드
 
 하네스에서 생성하는 스킬의 품질을 높이기 위한 상세 작성 가이드. SKILL.md Phase 4의 보충 레퍼런스.
@@ -142,7 +158,7 @@ ALWAYS use pdfplumber for table extraction. NEVER use PyPDF2 for tables.
 
 ```
 bigquery-skill/
-├── skill.md (개요 + 도메인 선택 가이드)
+├── SKILL.md (개요 + 도메인 선택 가이드)
 └── references/
     ├── finance.md (매출, 빌링 메트릭)
     ├── sales.md (기회, 파이프라인)
@@ -266,3 +282,33 @@ assertion 기반 채점 결과:
 - 스킬 생성 과정의 메타 정보 (테스트 결과, 반복 이력)
 - 사용자 대상 설명서 (스킬은 AI 에이전트를 위한 지시서)
 - 이미 Claude가 알고 있는 일반적 지식
+
+---
+
+## 9. 스킬 재사용 설계
+
+신규 스킬 생성 전, 기존 스킬과의 중복을 확인한다. 하네스를 반복 구축하다 보면 기능이 겹치는 스킬이 다른 이름으로 누적되기 쉽다.
+
+| 상황 | 조치 |
+|------|------|
+| 기존 스킬이 신규 기능을 완전히 포함 | 신규 생성 금지 — 기존 스킬을 에이전트에 연결 |
+| 기존 스킬이 부분 포함이고 일반화 가능 | 기존 스킬을 일반화하여 확장 |
+| 도메인 특화가 의도된 부분 포함 | 신규 생성 진행 — 별개 스킬로 유지 |
+| 기능 범위가 완전히 다름 | 신규 생성 진행 |
+
+**원칙:** 하나의 스킬이 하나의 역할에 집중할수록 재사용성이 높고 중복이 줄어든다. 역할이 두 가지 이상이면 분리할 수 있는지 먼저 검토한다.
+
+### 어디까지 일반화할지
+
+일반화는 무한히 가능하므로 **의도된 책임 범위**에서 멈춘다. 의도된 도메인 특화는 유지하고, 우연한 종속만 제거한다.
+
+예: "fintech 리스크 평가 PDF" 스킬
+
+| 단계 | 결과 |
+|------|------|
+| fintech 종속 제거 | "평가 결과 PDF" — 책임 범위가 평가 리포트면 여기서 멈춤 |
+| 평가 종속 제거 | "PDF 포매팅" — 이미 존재한다면 별개 스킬 생성하지 말고 재사용 |
+
+책임 범위가 "fintech 리스크 평가"로 의도된 특화라면 일반화하지 않고 별개 스킬로 유지한다.
+
+해당 스킬에 의존하는 에이전트의 동작이 변경될 수 있다. 확장 전 의존성을 확인하고, description에 확장된 사용 범위를 반영한다.

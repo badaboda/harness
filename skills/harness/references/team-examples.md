@@ -1,4 +1,22 @@
+<!--
+Copyright 2026 marcus-kkb
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
 # Agent Team Examples
+
+> ⚠️ **실행 방식 (Claude Code 2026-07+):** `TeamCreate`/`TeamDelete`는 폐지됐다. 아래 예시는 전부 현행 표기 — **named `Agent` 스폰(한 메시지 다중 호출 = 팬아웃) + 공유 `TaskCreate` + `SendMessage`**로 팀을 구성한다. 세션이 곧 단일 암묵 팀. **같은 이름을 살아있는 상태로 재호출하면 `-2`가 붙어 중복 에이전트가 생기므로, 스폰 전 반드시 생사 확인(재사용=`SendMessage` / fresh=`TaskStop`→재스폰)**. 실행 메커니즘·마이그레이션·§스폰 규율(중복 방지): `references/team-mode-mechanism.md`.
 
 ---
 
@@ -9,9 +27,10 @@
 
 ```
 [리더/오케스트레이터]
-    ├── TeamCreate(research-team)
-    ├── TaskCreate(4개 조사 작업)
-    ├── 팀원들이 자체 조율 (SendMessage)
+    ├── TaskCreate(4개 조사 작업)                       // 공유 작업목록 먼저
+    ├── 한 메시지에 Agent(name:"official") + Agent(name:"media")
+    │        + Agent(name:"community") + Agent(name:"background")  // 팬아웃 동시 스폰
+    ├── 팀원들이 자체 조율 (SendMessage / TaskUpdate)
     ├── 결과 수집 (Read)
     └── 종합 보고서 생성
 ```
@@ -35,19 +54,19 @@ Phase 1: 준비
   - 사용자 입력 분석 (주제, 조사 모드 파악)
   - _workspace/ 생성
 
-Phase 2: 팀 구성
-  - TeamCreate(team_name: "research-team", members: [
-      { name: "official", prompt: "공식 채널 조사..." },
-      { name: "media", prompt: "미디어/투자 동향 조사..." },
-      { name: "community", prompt: "커뮤니티 반응 조사..." },
-      { name: "background", prompt: "배경/경쟁 환경 조사..." }
-    ])
+Phase 2: 팀 구성 (named Agent 팬아웃)
   - TaskCreate(tasks: [
-      { title: "공식 채널 조사", assignee: "official" },
-      { title: "미디어 동향 조사", assignee: "media" },
-      { title: "커뮤니티 반응 조사", assignee: "community" },
-      { title: "배경 환경 조사", assignee: "background" }
+      { title: "공식 채널 조사", owner: "official" },
+      { title: "미디어 동향 조사", owner: "media" },
+      { title: "커뮤니티 반응 조사", owner: "community" },
+      { title: "배경 환경 조사", owner: "background" }
     ])
+  - 한 메시지에 4개 Agent 호출 (동시 스폰):
+      Agent(subagent_type:"general-purpose", name:"official",    model:"opus", prompt:"공식 채널 조사...")
+      Agent(subagent_type:"general-purpose", name:"media",       model:"opus", prompt:"미디어/투자 동향 조사...")
+      Agent(subagent_type:"general-purpose", name:"community",   model:"opus", prompt:"커뮤니티 반응 조사...")
+      Agent(subagent_type:"general-purpose", name:"background",  model:"opus", prompt:"배경/경쟁 환경 조사...")
+    ※ 스폰 전 생사 확인 — 재사용 아니면 중지 (team-mode-mechanism.md §스폰 규율)
 
 Phase 3: 조사 수행
   - 4명의 팀원이 독립적으로 조사
@@ -151,8 +170,8 @@ description: "SF 소설의 세계관을 구축하는 전문가. 물리 법칙, �
 ### 팀 워크플로우 상세
 
 ```
-Phase 1: TeamCreate(team_name: "novel-team", members: [worldbuilder, character-designer, plot-architect])
-         TaskCreate([세계관 구축, 캐릭터 설계, 플롯 구조])
+Phase 1: TaskCreate([세계관 구축, 캐릭터 설계, 플롯 구조])
+         한 메시지에 Agent(name:"worldbuilder") + Agent(name:"character-designer") + Agent(name:"plot-architect")
          → 팀원들이 자체 조율하며 병렬 작업
          → worldbuilder가 사회 구조 완성 시 character-designer에게 SendMessage
          → character-designer가 주인공 설정 시 plot-architect에게 SendMessage
@@ -161,8 +180,8 @@ Phase 2: Phase 1 팀 정리 → prose-stylist를 서브 에이전트로 호출 (
          prose-stylist가 _workspace/의 3개 산출물을 Read하여 집필
          → 결과를 _workspace/02_prose_draft.md에 저장
 
-Phase 3: 새 팀 생성 — TeamCreate(team_name: "review-team", members: [science-consultant, continuity-manager])
-         (세션당 한 팀만 활성이지만, Phase 1 팀을 정리했으므로 새 팀 생성 가능)
+Phase 3: 새 조합 스폰 — Agent(name:"science-consultant") + Agent(name:"continuity-manager")
+         (Phase 1 팀원은 TaskStop으로 정리 후 스폰 — 유휴 원본 방치 시 동명 충돌·-2 누적)
          → 두 리뷰어가 draft를 검토, 서로 발견을 공유
          → science-consultant가 물리 오류 발견 시 continuity-manager에게도 알림
          → 리뷰 완료 후 팀 정리
@@ -254,7 +273,7 @@ description: "웹툰 패널의 품질을 검수하는 전문가. 구도, 캐릭�
 > 코드 리뷰는 에이전트 팀이 빛나는 대표적 사례. 서로 다른 관점의 리뷰어들이 발견을 공유하고 도전하면서 더 깊은 리뷰가 가능.
 
 ```
-[리더] → TeamCreate(review-team)
+[리더] → 한 메시지에 Agent(name:"security-reviewer") + Agent(name:"performance-reviewer") + Agent(name:"test-reviewer")
     ├── security-reviewer: 보안 취약점 점검
     ├── performance-reviewer: 성능 영향 분석
     └── test-reviewer: 테스트 커버리지 검증
@@ -319,8 +338,8 @@ test ────SendMessage──→ security      ("인증 모듈 테스트 �
 팀 모드 추가 섹션: **팀 통신 프로토콜** (메시지 수신/발신, 작업 요청 범위)
 
 ### 스킬 파일 구조
-위치: `프로젝트/.claude/skills/{skill-name}/skill.md` (프로젝트 레벨)
-또는: `~/.claude/skills/{skill-name}/skill.md` (글로벌 레벨)
+위치: `프로젝트/.claude/skills/{skill-name}/SKILL.md` (프로젝트 레벨)
+또는: `~/.claude/skills/{skill-name}/SKILL.md` (글로벌 레벨)
 
 ### 통합 스킬 (오케스트레이터)
 팀 전체를 조율하는 상위 스킬. 시나리오별 에이전트 구성과 워크플로우를 정의.

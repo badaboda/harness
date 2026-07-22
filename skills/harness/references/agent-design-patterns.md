@@ -1,3 +1,19 @@
+<!--
+Copyright 2026 marcus-kkb
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
 # Agent Team Design Patterns
 
 ## 실행 모드: 에이전트 팀 vs 서브 에이전트
@@ -6,7 +22,9 @@
 
 ### 에이전트 팀 (Agent Teams) — 기본 모드
 
-팀 리더가 `TeamCreate`로 팀을 구성하고, 팀원들은 독립적인 Claude Code 인스턴스로 실행된다. 팀원들은 `SendMessage`로 직접 통신하고, 공유 작업 목록(`TaskCreate`/`TaskUpdate`)으로 자체 조율한다.
+팀 리더가 팀원을 **named `Agent`로 스폰**하고(세션이 곧 단일 암묵 팀), 팀원들은 독립적인 Claude Code 인스턴스로 실행된다. 팀원들은 `SendMessage`로 직접 통신하고, 공유 작업 목록(`TaskCreate`/`TaskUpdate`)으로 자체 조율한다.
+
+> ⚠️ **`TeamCreate`/`TeamDelete`는 폐지됨 (Claude Code 2026-07+).** 팀 실행 메커니즘·코드·마이그레이션은 `references/team-mode-mechanism.md` 필독.
 
 ```
 [리더] ←→ [팀원A] ←→ [팀원B]
@@ -15,10 +33,9 @@
 ```
 
 **핵심 도구:**
-- `TeamCreate`: 팀 생성 + 팀원 스폰
-- `SendMessage({to: name})`: 특정 팀원에게 메시지
-- `SendMessage({to: "all"})`: 브로드캐스트 (비용 높음, 드물게)
-- `TaskCreate`/`TaskUpdate`: 공유 작업 목록 관리
+- `Agent(subagent_type, name, model:"opus", prompt)`: 팀원 스폰. `name`으로 실행 중 통신·재개 가능. 동시 실행은 한 메시지에 여러 `Agent` 호출
+- `SendMessage({to: name})`: 특정 팀원에게 메시지. 백그라운드 팀원은 `{to:"main"}`으로 리더에 보고
+- `TaskCreate`/`TaskUpdate`: 공유 작업 목록 관리(`addBlockedBy`로 의존성)
 
 **특징:**
 - 팀원끼리 직접 대화, 도전, 검증 가능
@@ -28,13 +45,13 @@
 - 계획 승인 모드로 위험한 작업 전 검토 가능
 
 **제약:**
-- 세션당 한 팀만 **활성화** 가능 (단, Phase 간에 팀을 해체하고 새 팀 구성은 가능)
+- 세션당 **단일 암묵 팀** (내가 스폰한 named 에이전트들이 곧 팀 — 별도 팀 객체·해체 없음)
 - 중첩 팀 불가 (팀원이 자신의 팀 생성 불가)
 - 리더 고정 (이전 불가)
 - 토큰 비용 높음
 
 **팀 재구성 패턴:**
-Phase별로 다른 전문가 조합이 필요하면, 이전 팀의 산출물을 파일로 저장 → 팀 정리 → 새 팀 생성 순서로 진행한다. 이전 팀의 산출물은 `_workspace/` 에 보존되므로 새 팀이 Read로 접근 가능하다.
+Phase별로 다른 전문가 조합이 필요하면, 이전 산출물을 `_workspace/`에 저장해 두고(에이전트 종료 후에도 보존) 다음 Phase에 필요한 에이전트를 새 `Agent`로 스폰한다. `TeamDelete` 불필요 — 에이전트는 작업 완료 시 종료되며, 종료된 에이전트도 이름으로 `SendMessage`하면 컨텍스트를 유지한 채 재개된다.
 
 ### 서브 에이전트 (Sub-agents) — 경량 모드
 
@@ -258,6 +275,21 @@ description: "1-2문장 역할 설명. 트리거 키워드 나열."
 | 병렬성 | 독립 실행 가능하면 분리 | 순차 종속이면 통합 고려 |
 | 컨텍스트 | 컨텍스트 부담이 크면 분리 | 가볍고 빠르면 통합 |
 | 재사용성 | 다른 팀에서도 쓰면 분리 | 이 팀에서만 쓰면 통합 고려 |
+
+## 에이전트 재사용 설계
+
+신규 에이전트 생성 전, 기존 에이전트와의 중복을 확인한다. 하네스를 반복 구축하다 보면 역할이 겹치는 에이전트가 다른 이름으로 누적되기 쉽다.
+
+| 상황 | 조치 |
+|------|------|
+| 기존 에이전트가 신규 역할을 완전히 포함 | 신규 생성 금지 — 기존 에이전트 재사용 |
+| 기존 에이전트가 부분 포함이고 일반화 가능 | 기존 에이전트를 일반화하여 확장 |
+| 도메인 특화가 의도된 부분 포함 | 신규 생성 진행 — 별개 에이전트로 유지 |
+| 역할 범위가 완전히 다름 | 신규 생성 진행 |
+
+**원칙:** 하나의 에이전트가 하나의 역할에 집중할수록 재사용성이 높고 중복이 줄어든다. 역할이 두 가지 이상이면 분리할 수 있는지 먼저 검토한다.
+
+**기존 에이전트 일반화 시:** 해당 에이전트에 의존하는 오케스트레이터·팀 구성의 동작이 변경될 수 있다. 확장 전 의존성을 확인하고, 일반화 후 드라이런으로 기존 동작 유지를 확인한다.
 
 ## 스킬 vs 에이전트 구분
 

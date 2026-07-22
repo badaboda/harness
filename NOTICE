@@ -1,0 +1,16 @@
+harness — Agent Team & Skill Architect (Claude Code meta-skill)
+
+Copyright 2026 robin (https://github.com/revfactory)
+
+Licensed under the Apache License, Version 2.0 (the "License").
+See the LICENSE file for the full license text, or
+http://www.apache.org/licenses/LICENSE-2.0
+
+------------------------------------------------------------------------
+Modifications in this fork (https://github.com/badaboda/harness):
+
+Copyright 2026 marcus-kkb
+
+- v1.1.0 (2026-07-22): TeamCreate/TeamDelete 폐지 반영, named Agent 스폰
+  기반 팀 실행 방식으로 전환, team-mode-mechanism.md(SSOT) 추가,
+  중복 스폰 방지 규율 노출. 자세한 변경은 CHANGELOG.md 참조.

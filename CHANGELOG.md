@@ -2,6 +2,19 @@
 
 이 프로젝트는 [Semantic Versioning](https://semver.org/)을 따릅니다.
 
+## [1.1.0] - 2026-07-22
+
+### Changed
+
+- **팀 실행 방식 갱신 (Claude Code 2026-07+)** — `TeamCreate`/`TeamDelete` 폐지 반영. 팀원은 named `Agent` 스폰(세션이 단일 암묵 팀) + `SendMessage` + 공유 `TaskCreate`로 조율하는 현행 방식으로 전면 전환 (SKILL.md, orchestrator-template.md, agent-design-patterns.md, team-examples.md).
+- `team-examples.md` 다이어그램의 폐지 API(`TeamCreate(...)`) 예시를 전부 현행 `Agent(name:...)` 스폰 표기로 치환.
+
+### Added
+
+- `references/team-mode-mechanism.md` — 현행 팀 실행 메커니즘의 단일 진실 소스(SSOT). 이전↔현재 마이그레이션 표, 4원칙, 코드 패턴, **§스폰 규율(중복 에이전트 `-2` 누적 방지: 재사용=`SendMessage` / fresh=`TaskStop`→재스폰)** 포함.
+- SKILL.md 팀 패턴 섹션에 **중복 스폰 금지** 안내 + §스폰 규율 포인터 노출.
+- 전 소스파일(.md)에 Apache License 2.0 헤더 주석 + 루트 `NOTICE` 파일 (SKILL.md는 스킬 로더 frontmatter 보존 위해 frontmatter 직후 삽입).
+
 ## [1.0.1] - 2026-03-28
 
 ### Changed
