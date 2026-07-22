@@ -2,6 +2,16 @@
 
 이 프로젝트는 [Semantic Versioning](https://semver.org/)을 따릅니다.
 
+## [1.2.0] - 2026-07-22
+
+### Changed
+
+- **`references/team-mode-mechanism.md` §스폰 규율 확장 — 세션 간 "유령(ghost) 에이전트" 방지 추가.** 기존 세션 내 중복(`-2`) 방지에 더해, 이름 레지스트리가 세션을 넘어 잔류하는 반면 `TaskList`/`TaskStop`은 세션 스코프라 어긋나는 문제(증상 B)를 다룬다. 4개 규율 체계로 재구성:
+  - **규율 1 (세션-스코프 이름):** 고정 역할이름 재사용 금지 → `Agent(name:"data-eng-p3")`처럼 세션/Phase 유니크 토큰을 붙여 잔류 충돌·유령을 원천 분리, 반환명을 정본으로 라이브 로스터에 기록.
+  - **규율 2 (세션-시작 위생):** "고정 이름이 비어있다" 가정 금지, 로스터는 세션 시작 시 리셋.
+  - **규율 3 (main 브로커 + File-first):** 팀원→팀원 P2P `SendMessage`는 best-effort로 강등, main 릴레이가 유일한 신뢰 경로.
+  - **규율 4 (Phase/세션 종료 teardown):** 라이브 로스터 전원 `TaskStop`으로 잔류 누적 차단.
+
 ## [1.1.0] - 2026-07-22
 
 ### Changed
