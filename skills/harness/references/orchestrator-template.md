@@ -16,11 +16,12 @@ limitations under the License.
 
 # 오케스트레이터 스킬 템플릿
 
-오케스트레이터는 팀 전체를 조율하는 상위 스킬이다. 실행 모드별로 3가지 템플릿을 제공한다:
+오케스트레이터는 팀 전체를 조율하는 상위 스킬이다. 실행 모드별로 4가지 템플릿을 제공한다:
 
 - **템플릿 A: 에이전트 팀 모드 (기본)** — 2명 이상 협업 시 최우선 선택
 - **템플릿 B: 서브 에이전트 모드 (대안)** — 팀 통신이 불필요한 경우
 - **템플릿 C: 하이브리드 모드** — Phase마다 모드를 섞어 구성
+- **템플릿 D: Workflow 모드** — 흐름이 사전 확정된 대량 반복을 스크립트로 고정 (사용자 opt-in 필요)
 
 ---
 
@@ -86,9 +87,9 @@ description: "{도메인} 에이전트 팀을 조율하는 오케스트레이터
    Agent(subagent_type:"{type}", name:"{teammate-1}", model:"opus", prompt:"{역할·작업·완료 시 main 통지 지시}")
    Agent(subagent_type:"{type}", name:"{teammate-2}", model:"opus", prompt:"{...}")
    ```
-   팀원은 `TaskList`로 claim·`TaskUpdate`로 상태 갱신, `SendMessage({to:name})`로 상호 통신, `SendMessage({to:"main"})`로 리더 보고.
+   팀원은 `TaskList`로 claim·`TaskUpdate`로 상태 갱신, `SendMessage({to:name, summary:"...", message:"..."})`로 상호 통신, `SendMessage({to:"main", ...})`로 리더 보고.
 
-   > 팀원당 5~6개 작업이 적정. 의존성이 있는 작업은 `depends_on`으로 명시.
+   > 팀원당 5~6개 작업이 적정. 의존성은 `TaskUpdate(taskId, addBlockedBy:[...])`로 지정한다(`depends_on` 같은 필드는 없다).
 
 ### Phase 3: {주요 작업 — 예: 조사/생성/분석}
 
@@ -203,12 +204,14 @@ description: "{도메인} 에이전트를 조율하는 오케스트레이터. {�
 2. `_workspace/` 생성 (초기 실행 시, 또는 새 실행에서 기존 `_workspace/`를 보관 디렉토리로 이동한 직후)
 
 ### Phase 2: 병렬 실행
-단일 메시지에서 N개 Agent 도구를 동시 호출:
+단일 메시지에서 N개 Agent 도구를 동시 호출한다 (이것만으로 병렬 실행된다. 서브에이전트는 기본이 백그라운드이므로 별도 플래그가 필요 없다):
 
-| 에이전트 | 입력 | 출력 | model | run_in_background |
-|---------|------|------|-------|-------------------|
-| {agent-1} | {소스} | `_workspace/{phase}_{agent}_{artifact}.md` | opus | true |
-| {agent-2} | {소스} | `_workspace/{phase}_{agent}_{artifact}.md` | opus | true |
+| 에이전트 | 입력 | 출력 | model | isolation |
+|---------|------|------|-------|-----------|
+| {agent-1} | {소스} | `_workspace/{phase}_{agent}_{artifact}.md` | opus | - |
+| {agent-2} | {소스} | `_workspace/{phase}_{agent}_{artifact}.md` | opus | - |
+
+> 여러 에이전트가 **같은 소스 파일을 동시에 수정**하면 `isolation:"worktree"`를 지정해 각자 격리된 git worktree에서 작업시킨다. 읽기 전용이거나 서로 다른 파일만 쓰면 불필요하다.
 
 ### Phase 3: 통합
 1. 각 에이전트의 반환값 수집
@@ -250,7 +253,7 @@ description: "{도메인} 오케스트레이터 (하이브리드). {키워드}. 
 ### Phase 2: 병렬 자료 수집
 **실행 모드:** 서브 에이전트
 
-단일 메시지에서 Agent 도구로 N개 에이전트 병렬 호출 (`run_in_background: true`).
+단일 메시지에서 Agent 도구로 N개 에이전트 병렬 호출.
 각 결과는 `_workspace/02_{agent}_raw.md`에 저장.
 
 ### Phase 3: 합의 기반 통합
@@ -274,11 +277,88 @@ description: "{도메인} 오케스트레이터 (하이브리드). {키워드}. 
 
 ---
 
+## 템플릿 D: Workflow 모드 (결정적 오케스트레이션)
+
+에이전트 간 **협업**이 아니라 동일 처리의 **대량 반복**이고, 단계 순서·검증이 사전에 확정된 경우. 모델 판단이 아니라 스크립트가 흐름을 고정한다.
+
+> 🚫 **`Workflow` 도구는 사용자 opt-in 없이 호출할 수 없다.** 이 템플릿으로 오케스트레이터를 만들 때는 **본문에 "이 스킬 호출이 곧 Workflow 사용 근거"임을 명시**해야 실행 시점에 막히지 않는다.
+
+**설계 전에 알아야 할 런타임 사실 (공식 문서):**
+
+| 항목 | 사실 |
+|------|------|
+| opt-in 경로 | `ultracode` 키워드 또는 "워크플로우로 해줘" 같은 자연어 요청. **사용자가 직접 타이핑한 프롬프트에서만** 유효하다 — `-p` 전달, 스케줄 작업, 웹훅/PR 코멘트 경유 입력에서는 트리거되지 않는다 |
+| 실행 승인 | 매 실행마다 phase 목록을 보여주는 승인 프롬프트(권한 모드에 따라 다름). bypass/`-p`/SDK에서는 즉시 시작 |
+| **에이전트 권한** | ⚠️ 워크플로우가 스폰하는 서브에이전트는 **세션 모드와 무관하게 항상 `acceptEdits`로 실행되고 파일 편집이 자동 승인**된다. 파괴적 편집을 포함하는 워크플로우는 이 점을 오케스트레이터에 경고로 남긴다 |
+| 한도 | **동시 16개**(CPU에 따라 더 적음), **런당 총 1,000개**. 25개 초과 또는 예상 150만 토큰 초과 시 `Large workflow` 경고 |
+| 크기 가이드 | 기본 `medium`(15개 미만). `/config`의 Dynamic workflow size 또는 `workflowSizeGuideline` 설정으로 조정 — **권고이지 강제 상한이 아니다** |
+| 모델 | 각 에이전트는 **세션 모델**을 쓴다(스크립트가 단계별로 지정하지 않는 한). `CLAUDE_CODE_SUBAGENT_MODEL`이 설정돼 있으면 **그것이 둘 다 덮어쓴다** — opus를 전제한 하네스라면 큰 실행 전에 `/model`과 이 변수를 확인 |
+| 재개 | **같은 세션 안에서만** 가능. 캐시는 **에이전트 시작 순서**를 따라 replay되므로, 중간에 멈추면 그 뒤에 시작된 에이전트는 완료됐어도 재실행된다 → **긴 단일 에이전트보다 잘게 쪼갠 팬아웃이 진행을 더 보존한다** |
+| 저장·배포 | `/workflows`에서 `s`로 저장 → `.claude/workflows/`(프로젝트) 또는 `~/.claude/workflows/`(개인). 이후 `/<name>`으로 실행. **플러그인 배포는 플러그인 루트의 `workflows/` 디렉토리**, `/plugin:name`으로 네임스페이스됨 |
+| 비활성화 | `disableWorkflows` 설정 또는 `CLAUDE_CODE_DISABLE_WORKFLOWS=1`. 꺼져 있으면 `ultracode` 키워드도 동작하지 않는다 |
+
+````markdown
+---
+name: {domain}-orchestrator
+description: "{도메인} 오케스트레이터 (Workflow 기반). {키워드}. 후속 작업 키워드 포함."
+---
+
+## 실행 모드: Workflow
+
+이 스킬은 `Workflow` 도구 사용을 전제한다 — 이 스킬이 호출된 것 자체가 멀티에이전트 오케스트레이션에 대한 사용자 opt-in이다.
+
+## 워크플로우
+
+### Phase 0-1: 컨텍스트 확인 · 준비
+(템플릿 A와 동일 — `_workspace/` 분기, 작업 목록 산출)
+
+### Phase 2: 스크립트 구성
+
+메인이 먼저 **인라인으로 정찰**하여 처리 대상 목록을 확정한 뒤, 그 목록을 `args`로 넘긴다.
+스크립트는 `export const meta = {...}` 리터럴로 시작하고, `meta.phases`의 제목과 `phase()` 호출 제목을 일치시킨다.
+
+```js
+export const meta = {
+  name: '{domain}-sweep',
+  description: '{한 줄 설명}',
+  phases: [{ title: 'Process' }, { title: 'Verify' }],
+}
+const results = await pipeline(
+  args,                                                    // 정찰로 확정한 대상 목록
+  item => agent(`{처리 지시}: ${item}`, {phase:'Process', schema: RESULT_SCHEMA}),
+  (res, item) => agent(`{검증 지시}: ${item}`, {phase:'Verify', schema: VERDICT_SCHEMA})
+                   .then(v => ({...res, verdict: v}))
+)
+return results.filter(Boolean).filter(r => r.verdict?.ok)
+```
+
+**설계 규칙:**
+- **기본은 `pipeline()`** — 항목이 단계를 독립 통과해 배리어 대기가 없다. 전역 dedup·0건 조기종료처럼 *모든* 이전 결과가 동시에 필요한 자리에서만 `parallel()`을 쓴다
+- **`schema`로 반환을 구조화** — 파싱 불필요, 형식 일탈 시 모델이 재시도한다
+- 실패한 항목은 `null`이 되므로 **`.filter(Boolean)` 후 사용**
+- 파일을 병렬 수정하면 `{isolation:'worktree'}`
+- 스크립트에서 `Date.now()`/`Math.random()`은 쓸 수 없다 — 타임스탬프는 `args`로 주입하고, 결과 스탬프는 워크플로우 반환 후에 찍는다
+- 커버리지를 잘라냈으면(top-N, 샘플링) `log()`로 무엇을 뺐는지 남긴다 — 조용한 절단은 "전부 처리함"으로 읽힌다
+
+### Phase 3: 결과 종합
+1. 워크플로우 반환값을 메인이 수집
+2. 산출물은 `_workspace/`에 저장, 최종본만 사용자 경로로 출력
+3. 다단계 작업이면 **결과를 읽고 다음 워크플로우를 결정** — 한 번에 다 넣지 말고 Phase 단위로 끊는다
+
+## 에러 핸들링
+- 단계가 throw하면 해당 항목만 `null`로 떨어지고 나머지는 계속 진행 — 최종 보고서에 누락 항목 명시
+- 스크립트 수정 후에는 `{scriptPath, resumeFromRunId}`로 재개 (변경되지 않은 앞부분은 캐시에서 즉시 반환)
+- 결과가 비었으면 추측하지 말고 transcript 디렉토리의 `journal.jsonl`에서 각 에이전트의 실제 반환값을 확인
+````
+
+---
+
 ## 작성 원칙
 
-1. **실행 모드를 먼저 명시** — 오케스트레이터 상단에 "에이전트 팀" / "서브 에이전트" / "하이브리드" 중 하나 명시. 하이브리드면 Phase별 모드 표 필수
-2. **팀 모드는 named `Agent` 스폰 + SendMessage + TaskCreate 사용법을 구체적으로** — 작업목록·의존성, 팀원 스폰, 통신 규칙 (`references/team-mode-mechanism.md`)
-3. **서브 모드는 Agent 도구 파라미터를 완전히 명시** — name, subagent_type, prompt, model
+1. **실행 모드를 먼저 명시** — 오케스트레이터 상단에 "에이전트 팀" / "서브 에이전트" / "Workflow" / "하이브리드" 중 하나 명시. 하이브리드면 Phase별 모드 표 필수
+2. **팀 모드는 named `Agent` 스폰 + SendMessage + TaskCreate 사용법을 구체적으로** — 작업목록·의존성(`addBlockedBy`), 팀원 스폰, 통신 규칙. 스폰 전 `name` 지원 여부 확인까지 포함 (`references/team-mode-mechanism.md`)
+3. **서브 모드는 Agent 도구 파라미터를 실재하는 것만 명시** — `subagent_type`, `prompt`, `model`, (필요 시) `isolation`. 무시되는 `team_name`은 쓰지 않고, 병렬을 `run_in_background`로 표기하지 않는다(백그라운드가 기본값). **백그라운드 서브에이전트에는 `TaskCreate`/`TaskList`가 없으므로** 공유 작업목록 참여를 요구하지 않는다
+4. **Workflow 모드는 opt-in 근거를 본문에 명시** — 없으면 실행 시점에 도구를 쓸 수 없다
 4. **파일 경로는 절대적으로** — 상대 경로 금지, `_workspace/` 기준 명확한 경로
 5. **Phase 간 의존성 명시** — 어떤 Phase가 어떤 Phase의 결과에 의존하는지. 하이브리드는 모드 전환 지점을 특히 강조
 6. **에러 핸들링은 현실적으로** — "모든 것이 성공한다"고 가정하지 않음

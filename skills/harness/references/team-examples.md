@@ -17,6 +17,8 @@ limitations under the License.
 # Agent Team Examples
 
 > ⚠️ **실행 방식 (Claude Code 2026-07+):** `TeamCreate`/`TeamDelete`는 폐지됐다. 아래 예시는 전부 현행 표기 — **named `Agent` 스폰(한 메시지 다중 호출 = 팬아웃) + 공유 `TaskCreate` + `SendMessage`**로 팀을 구성한다. 세션이 곧 단일 암묵 팀. **같은 이름을 살아있는 상태로 재호출하면 `-2`가 붙어 중복 에이전트가 생기므로, 스폰 전 반드시 생사 확인(재사용=`SendMessage` / fresh=`TaskStop`→재스폰)**. 실행 메커니즘·마이그레이션·§스폰 규율(중복 방지): `references/team-mode-mechanism.md`.
+>
+> 🔴 아래 예시의 팀 구성은 **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`이 켜져 있을 때만** 성립한다. 에이전트 팀은 실험 기능이고 기본값이 꺼져 있어, 끈 채로 시도하면 조용히 서브에이전트로 대체된다 (`references/team-mode-mechanism.md` §전제조건). 또한 `SendMessage`는 `summary`(5~10단어)를 함께 넘겨야 한다.
 
 ---
 

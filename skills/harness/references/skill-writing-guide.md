@@ -22,6 +22,7 @@ limitations under the License.
 
 ## 목차
 
+0. [Frontmatter 필드](#0-frontmatter-필드)
 1. [Description 작성 패턴](#1-description-작성-패턴)
 2. [본문 작성 스타일](#2-본문-작성-스타일)
 3. [출력 형식 정의 패턴](#3-출력-형식-정의-패턴)
@@ -30,6 +31,37 @@ limitations under the License.
 6. [스크립트 번들링 판단 기준](#6-스크립트-번들링-판단-기준)
 7. [데이터 스키마 표준](#7-데이터-스키마-표준)
 8. [스킬에 포함하지 않을 것](#8-스킬에-포함하지-않을-것)
+9. [스킬 재사용 설계](#9-스킬-재사용-설계)
+
+---
+
+## 0. Frontmatter 필드
+
+**모든 필드가 선택이고, `description`만 권장된다.** (`name`조차 필수가 아니다 — 생략하면 디렉토리명이 쓰인다.)
+
+| 필드 | 용도 |
+|------|------|
+| `description` | **권장. 유일한 트리거 메커니즘** (§1). 생략 시 본문 첫 문단이 대신 쓰인다. `description`+`when_to_use` 합계가 **1,536자에서 잘리므로 핵심 사용사례를 맨 앞에** |
+| `name` | 스킬 목록에 보일 표시 이름. **개인/프로젝트 스킬에서는 호출 명령이 디렉토리명에서 오므로 `name`은 라벨일 뿐**이다. 플러그인 스킬에서만 명령 이름의 마지막 세그먼트를 결정한다 |
+| `when_to_use` | 트리거 문구·예시 요청 추가. `description`에 덧붙고 1,536자 상한을 함께 쓴다 |
+| `allowed-tools` | 이 스킬을 호출한 **그 턴 동안** 권한 확인 없이 쓸 도구. 다음 사용자 메시지에 해제된다 |
+| `disallowed-tools` | 스킬 활성 동안 도구 풀에서 제거. 자율 루프에서 `AskUserQuestion`을 막는 식 |
+| `disable-model-invocation` | `true`면 Claude가 자동 로드하지 못하고 `/name`으로만 실행. 부작용 있는 워크플로우(`/deploy`)용 |
+| `user-invocable` | `false`면 `/` 메뉴에서 숨김. 사용자가 직접 실행할 의미가 없는 배경지식용 |
+| `model` / `effort` | 스킬 활성 동안의 모델·추론 강도 오버라이드(그 턴 한정, 설정에 저장되지 않음) |
+| `context: fork` + `agent` | 스킬을 **포크된 서브에이전트 컨텍스트에서** 실행. 어떤 서브에이전트 타입을 쓸지는 `agent` |
+| `paths` | glob 패턴. 해당 파일을 다룰 때만 자동 로드 |
+| `argument-hint` / `arguments` | 자동완성 힌트, `$name` 치환용 위치 인자 |
+
+**호출 이름이 정해지는 규칙:**
+
+| 위치 | 명령 이름 | 예 |
+|------|----------|-----|
+| `.claude/skills/{dir}/SKILL.md` | 디렉토리명 | `/deploy-staging` |
+| 중첩 `.claude/skills/` (이름 충돌 시) | 작업 디렉토리 기준 상대경로 + 스킬 디렉토리명 | `apps/web/.claude/skills/deploy/` → `/apps/web:deploy` |
+| 플러그인 `skills/` 하위 | frontmatter `name` 또는 디렉토리명, 플러그인 접두 | `/my-plugin:review` |
+
+**커맨드를 만들지 않는 이유:** 공식적으로 **커스텀 커맨드는 스킬로 통합**됐다 — `.claude/commands/deploy.md`와 `.claude/skills/deploy/SKILL.md`는 둘 다 `/deploy`를 만들고 동작이 같다. 기존 `commands/` 파일은 계속 동작하지만, 스킬 쪽만 지원 파일 디렉토리·호출 주체 제어(`disable-model-invocation`/`user-invocable`)·자동 로드를 갖는다. 하네스는 스킬만 산출한다.
 
 ---
 
